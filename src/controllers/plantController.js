@@ -4,9 +4,10 @@ exports.getPlants = async (req, res) => {
   try {
     const plants = await Plant.find();
     res.json(plants);
-    console.log('plants', plants);
+    
   } catch (err) {
     console.error(err);
+    console.log('plants', plants);
     res.status(500).json({ message: 'Server Error' });
   }
 };
