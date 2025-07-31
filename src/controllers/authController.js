@@ -4,7 +4,40 @@ const jwt = require('jsonwebtoken');
 
 exports.register = async (req, res) => {
   try {
+    // Validate request body
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ 
+        message: 'Invalid request body',
+        error: 'Request body must be a valid JSON object'
+      });
+    }
+
     const { email, password } = req.body;
+    
+    // Validate required fields
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ 
+        message: 'Invalid email',
+        error: 'Email is required and must be a string'
+      });
+    }
+
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ 
+        message: 'Invalid password',
+        error: 'Password is required and must be a string'
+      });
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        message: 'Invalid email format',
+        error: 'Please provide a valid email address'
+      });
+    }
+
     const userExists = await User.findOne({ email });
     if (userExists) return res.status(400).json({ message: 'User already exists' });
 
@@ -14,22 +47,55 @@ exports.register = async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, userId: user._id });
   } catch (err) {
+    console.error('Registration error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
 exports.login = async (req, res) => {
   try {
+    // Validate request body
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ 
+        message: 'Invalid request body',
+        error: 'Request body must be a valid JSON object'
+      });
+    }
+
     const { email, password } = req.body;
+    
+    // Validate required fields
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ 
+        message: 'Invalid email',
+        error: 'Email is required and must be a string'
+      });
+    }
+
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ 
+        message: 'Invalid password',
+        error: 'Password is required and must be a string'
+      });
+    }
+
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const token = jwt.sign(
+  { id: user._id }, 
+  process.env.JWT_SECRET,
+  { expiresIn: '7d' }
+);
     res.json({ token, userId: user._id });
   } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ message: 'Server error' });
   }
+};
+exports.updateUserProfile = async (req, res) => {
+  const updated = await User.findByIdAndUpdate(req.user.id, req.body, { new: true });
+  res.json(updated);
 };
