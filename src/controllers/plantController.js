@@ -3,6 +3,8 @@ const Plant = require('../models/plant');
 const PDFDocument = require('pdfkit');
 exports.getPlants = async (req, res) => {
   try {
+    console.log(req,'req');
+    
   const userId = req.id;
 console.log("userId",userId)
     if (!userId) {
