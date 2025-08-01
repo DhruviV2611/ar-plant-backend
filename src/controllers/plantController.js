@@ -1,31 +1,22 @@
 // plantController.js
 const Plant = require('../models/plant');
 const PDFDocument = require('pdfkit');
+
 exports.getPlants = async (req, res) => {
   try {
-    console.log(req,'req');
-    
-  const userId = req.id;
-console.log("userId",userId)
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID not found in token' });
-    }
-
-    const plants = await Plant.find({ userId });
-    res.json(plants);
-  } catch (err) {
-    console.error('getPlants error:', err);
+    console.log('Token decoded user:', req.user); // should log user with an id
+    const plants = await Plant.find({ userId: req.user.id });
+    res.status(200).json(plants);
+  } catch (error) {
+    console.error('Error in getPlants:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
-
-
-
 exports.addPlant = async (req, res) => {
   try {
     // Validate request body
     if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid request body',
         error: 'Request body must be a valid JSON object'
       });
@@ -34,7 +25,7 @@ exports.addPlant = async (req, res) => {
     // Validate required fields
     const { name, scientificName } = req.body;
     if (!name || typeof name !== 'string') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid plant data',
         error: 'Plant name is required and must be a string'
       });
@@ -45,158 +36,232 @@ exports.addPlant = async (req, res) => {
     const plant = new Plant(plantData);
     await plant.save();
     res.status(201).json(plant);
-    console.log('plant', plant);
   } catch (err) {
-    console.error('Add plant error:', err);
-    if (err.name === 'ValidationError') {
-      return res.status(400).json({ 
-        message: 'Validation error',
-        error: Object.values(err.errors).map(e => e.message).join(', ')
-      });
-    }
-    res.status(500).json({ 
-      message: 'Server Error',
-      error: 'Failed to add plant'
-    });
+    console.error('addPlant error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// Get one plant by ID (ensure it belongs to the user)
 exports.getPlantById = async (req, res) => {
   try {
     const plant = await Plant.findOne({ _id: req.params.id, userId: req.user.id });
-    if (!plant) return res.status(404).json({ message: 'Plant not found or you do not have permission to access it' });
-    res.json(plant);
-  } catch (err) {
-    console.error(err);
+    if (!plant) {
+      return res.status(404).json({ message: 'Plant not found or not authorized' });
+    }
+    res.status(200).json(plant);
+  } catch (error) {
+    console.error('Error in getPlantById:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// Delete a plant by ID (ensure it belongs to the user)
 exports.deletePlant = async (req, res) => {
   try {
     const plant = await Plant.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
-    if (!plant) return res.status(404).json({ message: 'Plant not found or you do not have permission to delete it' });
-    res.json({ message: 'Plant deleted successfully' });
-  } catch (err) {
-    console.error(err);
+    if (!plant) {
+      return res.status(404).json({ message: 'Plant not found or not authorized to delete' });
+    }
+    res.status(200).json({ message: 'Plant removed' });
+  } catch (error) {
+    console.error('Error in deletePlant:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// Update a plant by ID (ensure it belongs to the user)
 exports.updatePlant = async (req, res) => {
   try {
-    // Also ensure updatedBy field is set to current user id, useful for auditing
+    const { id } = req.params;
     const plant = await Plant.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { ...req.body, updatedAt: Date.now() }, // Update updatedAt timestamp
-      { new: true }
+      { _id: id, userId: req.user.id },
+      req.body,
+      { new: true, runValidators: true }
     );
-    if (!plant) return res.status(404).json({ message: 'Plant not found or you do not have permission to update it' });
-    res.json(plant);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server Error' });
+    if (!plant) {
+      return res.status(404).json({ message: 'Plant not found or not authorized to update' });
+    }
+    res.status(200).json(plant);
+  } catch (error) {
+    console.error('Error in updatePlant:', error);
+    res.status(400).json({ message: 'Error updating plant', error: error.message });
   }
 };
 
-// AR Plant Identification (stub/mock version)
 exports.identifyPlant = async (req, res) => {
+  // This is a placeholder for actual plant identification logic (e.g., external API call)
   try {
-    // Validate request body
-    if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({ 
-        message: 'Invalid request body',
-        error: 'Request body must be a valid JSON object'
-      });
+    const { photoUrl } = req.body;
+    if (!photoUrl) {
+      return res.status(400).json({ message: 'Photo URL is required for identification.' });
     }
 
-    const { imageBase64 } = req.body;
-
-    // Validate imageBase64
-    if (!imageBase64 || typeof imageBase64 !== 'string') {
-      return res.status(400).json({ 
-        message: 'Invalid image data',
-        error: 'imageBase64 field is required and must be a string'
-      });
-    }
-
-    // Basic validation for base64 format
-    if (!imageBase64.startsWith('data:image/') && !/^[A-Za-z0-9+/]*={0,2}$/.test(imageBase64)) {
-      return res.status(400).json({ 
-        message: 'Invalid image format',
-        error: 'imageBase64 must be a valid base64 encoded image'
-      });
-    }
-
-    // Replace this stub with a real ML model or external API integration
-    const mockResult = {
-      scientificName: 'Ficus lyrata',
-      commonName: 'Fiddle Leaf Fig',
-      confidenceScore: 0.91,
+    // Simulate an external API call for plant identification
+    const identifiedData = {
+      scientificName: 'Monstera deliciosa',
+      commonName: 'Swiss Cheese Plant',
+      confidenceScore: 0.95,
+      careTips: {
+        light: 'Bright indirect light',
+        water: 'Water when top inch of soil is dry',
+        soil: 'Well-draining potting mix',
+        temperature: '18-30°C',
+      },
+      toxicity: {
+        isToxicToCats: true,
+        isToxicToDogs: true,
+        isToxicToHumans: true,
+        symptoms: 'Oral irritation, vomiting, difficulty swallowing',
+        severity: 'Mild to Moderate',
+      },
+      imageUrl: photoUrl,
     };
-
-    res.json(mockResult);
-  } catch (err) {
-    console.error('Plant identification error:', err);
-    res.status(500).json({ 
-      message: 'Identification failed',
-      error: 'An error occurred during plant identification'
-    });
+    res.status(200).json(identifiedData);
+  } catch (error) {
+    console.error('Error in identifyPlant:', error);
+    res.status(500).json({ message: 'Plant identification failed.' });
   }
 };
 
 exports.getCareTipsBySpecies = async (req, res) => {
-  const species = req.params.species;
-  // In future, fetch from a central care guide collection
-  const plant = await Plant.findOne({ scientificName: species });
-  if (!plant) return res.status(404).json({ message: 'Not found' });
-
-  res.json(plant.careTips);
+  try {
+    const { species } = req.params;
+    // In a real application, you might fetch this from a database or external API
+    const careTips = {
+      'Monstera deliciosa': {
+        light: 'Bright indirect light',
+        water: 'Water when top inch of soil is dry',
+        soil: 'Well-draining potting mix',
+        temperature: '18-30°C',
+        growthTips: 'Provide a moss pole for climbing.',
+        maintenanceFrequency: 'Moderate',
+        indoorSuitability: true,
+        outdoorSuitability: false,
+      },
+      'Aloe vera': {
+        light: 'Bright direct light',
+        water: 'Water thoroughly, allow soil to dry completely between waterings',
+        soil: 'Sandy, well-draining soil',
+        temperature: '13-27°C',
+        growthTips: 'Propagate from pups.',
+        maintenanceFrequency: 'Low',
+        indoorSuitability: true,
+        outdoorSuitability: true,
+      },
+      // ... more species
+    };
+    const tips = careTips[species];
+    if (tips) {
+      res.status(200).json(tips);
+    } else {
+      res.status(404).json({ message: 'Care tips not found for this species.' });
+    }
+  } catch (error) {
+    console.error('Error in getCareTipsBySpecies:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
 };
 
 exports.getToxicityInfo = async (req, res) => {
-  const plant = await Plant.findOne({ _id: req.params.id, userId: req.user.id });
-  if (!plant) return res.status(404).json({ message: 'Not found' });
-
-  res.json(plant.toxicity);
+  try {
+    const { id } = req.params;
+    const plant = await Plant.findOne({ _id: id, userId: req.user.id }).select('toxicity');
+    if (!plant || !plant.toxicity) {
+      return res.status(404).json({ message: 'Toxicity information not found for this plant.' });
+    }
+    res.status(200).json(plant.toxicity);
+  } catch (error) {
+    console.error('Error in getToxicityInfo:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
 };
 
 exports.addJournalEntry = async (req, res) => {
-  const { notes, photoUrl } = req.body;
-  const { plantId } = req.params;
+  try {
+    const { plantId } = req.params;
+    const { notes, photoUrl } = req.body;
 
-  const entry = {
-    entryId: new mongoose.Types.ObjectId().toString(),
-    notes,
-    photoUrl,
-  };
+    if (!notes) {
+      return res.status(400).json({ message: 'Journal entry notes are required.' });
+    }
 
-  const plant = await Plant.findOneAndUpdate(
-    { _id: plantId, userId: req.user.id },
-    { $push: { journalEntries: entry }, updatedAt: Date.now() },
-    { new: true }
-  );
+    const plant = await Plant.findOne({ _id: plantId, userId: req.user.id });
+    if (!plant) {
+      return res.status(404).json({ message: 'Plant not found or not authorized.' });
+    }
 
-  res.json(plant);
+    const newEntry = {
+      entryId: new mongoose.Types.ObjectId().toString(), // Generate a unique ID for the entry
+      notes,
+      photoUrl,
+      timestamp: new Date(),
+    };
+    plant.journalEntries.push(newEntry);
+    await plant.save();
+
+    res.status(201).json(plant); // Return the updated plant object
+  } catch (error) {
+    console.error('Error adding journal entry:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
 };
 
 exports.deleteJournalEntry = async (req, res) => {
-  const { plantId, entryId } = req.params;
+  try {
+    const { plantId, entryId } = req.params;
 
-  const plant = await Plant.findOneAndUpdate(
-    { _id: plantId, userId: req.user.id },
-    { $pull: { journalEntries: { entryId } }, updatedAt: Date.now() },
-    { new: true }
-  );
+    const plant = await Plant.findOne({ _id: plantId, userId: req.user.id });
+    if (!plant) {
+      return res.status(404).json({ message: 'Plant not found or not authorized.' });
+    }
 
-  res.json(plant);
+    plant.journalEntries = plant.journalEntries.filter(
+      (entry) => entry.entryId !== entryId
+    );
+    await plant.save();
+
+    res.status(200).json(plant); // Return the updated plant object
+  } catch (error) {
+    console.error('Error deleting journal entry:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
 };
 
-exports.exportPDF = async (req, res) => {
-  const plants = await Plant.find({ userId: req.user.id });
+exports.updateJournalEntry = async (req, res) => {
+  try {
+    const { plantId, entryId } = req.params;
+    const { notes, photoUrl } = req.body;
+
+    const plant = await Plant.findOne({ _id: plantId, userId: req.user.id });
+    if (!plant) {
+      return res.status(404).json({ message: 'Plant not found or not authorized.' });
+    }
+
+    const entryIndex = plant.journalEntries.findIndex(
+      (entry) => entry.entryId === entryId
+    );
+
+    if (entryIndex === -1) {
+      return res.status(404).json({ message: 'Journal entry not found.' });
+    }
+
+    // Update the entry
+    plant.journalEntries[entryIndex].notes = notes || plant.journalEntries[entryIndex].notes;
+    plant.journalEntries[entryIndex].photoUrl = photoUrl || plant.journalEntries[entryIndex].photoUrl;
+    // Optionally update timestamp if the entry content changes
+    plant.journalEntries[entryIndex].timestamp = new Date();
+
+    await plant.save();
+
+    res.status(200).json(plant); // Return the updated plant object
+  } catch (error) {
+    console.error('Error updating journal entry:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// Export journal to PDF
+exports.exportJournalPDF = async (req, res) => {
+  const plants = await Plant.find({ userId: req.user.id }).populate('journalEntries');
+
   const doc = new PDFDocument();
   let buffers = [];
 
@@ -217,11 +282,31 @@ exports.exportPDF = async (req, res) => {
     doc
       .moveDown()
       .fontSize(14)
-      .text(`🌿 ${plant.name} (${plant.scientificName})`, { underline: true })
+      .text(`Plant Name: ${plant.name}`, { underline: true })
       .fontSize(12)
-      .text(`Care: ${plant.careTips?.light || ''}`)
-      .text(`Toxicity: ${plant.toxicity?.severity || 'None'}`)
-      .text(`Journal Entries: ${plant.journalEntries.length}`);
+      .text(`Scientific Name: ${plant.scientificName || 'N/A'}`)
+      .text(`Planted Date: ${plant.plantedDate ? new Date(plant.plantedDate).toLocaleDateString() : 'N/A'}`)
+      .moveDown()
+      .text('Care Tips:', { underline: true })
+      .text(`  Light: ${plant.careTips?.light || 'N/A'}`)
+      .text(`  Water: ${plant.careTips?.water || 'N/A'}`)
+      .text(`  Temperature: ${plant.careTips?.temperature || 'N/A'}`)
+      .text(`  Soil: ${plant.careTips?.soil || 'N/A'}`)
+      .moveDown();
+
+    if (plant.journalEntries && plant.journalEntries.length > 0) {
+      doc.fontSize(12).text('Journal Entries:', { underline: true });
+      plant.journalEntries.forEach((entry) => {
+        doc
+          .text(`  Date: ${new Date(entry.timestamp).toLocaleDateString()}`)
+          .text(`  Notes: ${entry.notes}`)
+          .text(`  Photo: ${entry.photoUrl || 'N/A'}`)
+          .moveDown();
+      });
+    } else {
+      doc.fontSize(12).text('No journal entries for this plant.', { italic: true }).moveDown();
+    }
+    doc.moveDown(); // Space between plants
   });
 
   doc.end();

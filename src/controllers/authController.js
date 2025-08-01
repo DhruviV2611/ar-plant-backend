@@ -6,33 +6,33 @@ exports.register = async (req, res) => {
   try {
     // Validate request body
     if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid request body',
         error: 'Request body must be a valid JSON object'
       });
     }
 
     const { email, password } = req.body;
-    
+
     // Validate required fields
     if (!email || typeof email !== 'string') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid email',
         error: 'Email is required and must be a string'
       });
     }
 
     if (!password || typeof password !== 'string') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid password',
         error: 'Password is required and must be a string'
       });
     }
 
     // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid email format',
         error: 'Please provide a valid email address'
       });
@@ -42,12 +42,16 @@ exports.register = async (req, res) => {
     if (userExists) return res.status(400).json({ message: 'User already exists' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, password: hashedPassword });
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, userId: user._id });
+    const user = new User({ email, password: hashedPassword });
+    await user.save();
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.status(201).json({ message: 'User registered successfully', token, userId: user._id });
   } catch (err) {
-    console.error('Registration error:', err);
+    console.error('Register error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -56,49 +60,51 @@ exports.login = async (req, res) => {
   try {
     // Validate request body
     if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid request body',
         error: 'Request body must be a valid JSON object'
       });
     }
 
     const { email, password } = req.body;
-    
+
     // Validate required fields
     if (!email || typeof email !== 'string') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid email',
         error: 'Email is required and must be a string'
       });
     }
 
     if (!password || typeof password !== 'string') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid password',
         error: 'Password is required and must be a string'
       });
-    }
+    };
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
-const token = jwt.sign(
-  { id: user._id }, 
-  process.env.JWT_SECRET,
-  { expiresIn: '7d' }
-);
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
     res.json({ token, userId: user._id });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 exports.updateUserProfile = async (req, res) => {
   const updated = await User.findByIdAndUpdate(req.user.id, req.body, { new: true });
   res.json(updated);
 };
+
 exports.getUserDetails = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -106,8 +112,8 @@ exports.getUserDetails = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     res.json(user);
-  } catch (err) {
-    console.error('Get me error:', err);
+  } catch (error) {
+    console.error('Error fetching user details:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

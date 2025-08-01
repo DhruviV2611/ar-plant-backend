@@ -2,8 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const jwt = require('express-jwt'); // If you're using this or similar
-const jwksRsa = require('jwks-rsa');
 dotenv.config();
 const app = express();
 
@@ -50,12 +48,7 @@ mongoose.connect(process.env.MONGO_URI)
     process.exit(1); // Exit if DB connection fails
   });
 
-app.use((req, res, next) => {
-    if (req.auth && req.auth.userId) { // Assuming your JWT decodes to req.auth and has userId
-        req.user = { id: req.auth.userId };
-    }
-    next();
-});
+
 
 const plantRoutes = require('./src/routes/plantRoutes');
 const authRoutes = require('./src/routes/authRoutes');

@@ -60,10 +60,10 @@ const plantSchema = new mongoose.Schema({
   // imageUrl: [String], // This is replaced by photos in journalEntries for specific timestamps
   journalEntries: [journalEntrySchema], // Array of journal entries
   reminders: [reminderSchema], // Array of reminders for this plant
-  userId: {
+   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
   },
   // userNotes: String, // General notes about the plant, can be combined with journal
   foundLocation: String,
@@ -75,12 +75,7 @@ const plantSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
-  }
-});
-
-plantSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
+  },
 });
 
 module.exports = mongoose.model('Plant', plantSchema);
