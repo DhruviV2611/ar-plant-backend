@@ -30,7 +30,8 @@ exports.register = async (req, res) => {
     }
 
     // Basic email validation
-    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    // CORRECTED: The regex should be defined without double escaping
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Changed from /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         message: 'Invalid email format',
@@ -57,47 +58,21 @@ exports.register = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
-  try {
-    // Validate request body
-    if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({
-        message: 'Invalid request body',
-        error: 'Request body must be a valid JSON object'
-      });
-    }
+  const { email, password } = req.body;
 
-    const { email, password } = req.body;
-
-    // Validate required fields
-    if (!email || typeof email !== 'string') {
-      return res.status(400).json({
-        message: 'Invalid email',
-        error: 'Email is required and must be a string'
-      });
-    }
-
-    if (!password || typeof password !== 'string') {
-      return res.status(400).json({
-        message: 'Invalid password',
-        error: 'Password is required and must be a string'
-      });
-    };
-
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-    res.json({ token, userId: user._id });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ message: 'Server error' });
+  const user = await User.findOne({ email });
+  if (!user || user.password !== password) {
+    return res.status(401).json({ message: 'Invalid credentials' });
   }
+
+  const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.TOKEN_EXPIRY });
+  const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY });
+
+  // Store refresh token in DB
+  user.refreshToken = refreshToken;
+  await user.save();
+
+  res.json({ token: accessToken, refreshToken, user: { _id: user._id, email: user.email } });
 };
 
 exports.updateUserProfile = async (req, res) => {
@@ -116,4 +91,9 @@ exports.getUserDetails = async (req, res) => {
     console.error('Error fetching user details:', error);
     res.status(500).json({ message: 'Server error' });
   }
+};
+exports.logout = async (req, res) => {
+  const { userId } = req.body;
+  await User.findByIdAndUpdate(userId, { refreshToken: '' });
+  res.json({ message: 'Logged out successfully' });
 };

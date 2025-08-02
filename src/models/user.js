@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
     theme: String,
     exportFormat: String,
   },
+  refreshToken: String,
 });
 
 module.exports = mongoose.model('User', userSchema);

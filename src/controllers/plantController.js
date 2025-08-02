@@ -4,98 +4,124 @@ const PDFDocument = require('pdfkit');
 
 exports.getPlants = async (req, res) => {
   try {
-    console.log('Token decoded user:', req.user); // should log user with an id
-    const plants = await Plant.find({ userId: req.user.id });
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
+    }
+
+    console.log('Fetching plants for user:', req.user._id);
+
+    const plants = await Plant.find({ userId: req.user._id });
     res.status(200).json(plants);
   } catch (error) {
     console.error('Error in getPlants:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
+
 exports.addPlant = async (req, res) => {
   try {
-    // Validate request body
-    if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({
-        message: 'Invalid request body',
-        error: 'Request body must be a valid JSON object'
-      });
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }
 
-    // Validate required fields
     const { name, scientificName } = req.body;
+
     if (!name || typeof name !== 'string') {
       return res.status(400).json({
         message: 'Invalid plant data',
-        error: 'Plant name is required and must be a string'
+        error: 'Plant name is required and must be a string',
       });
     }
 
-    // Add the userId from the authenticated user to the plant data
-    const plantData = { ...req.body, userId: req.user.id };
+    const plantData = { ...req.body, userId: req.user._id };
     const plant = new Plant(plantData);
     await plant.save();
+
     res.status(201).json(plant);
   } catch (err) {
     console.error('addPlant error:', err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server Error', error: err.message });
   }
 };
 
 exports.getPlantById = async (req, res) => {
   try {
-    const plant = await Plant.findOne({ _id: req.params.id, userId: req.user.id });
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
+    }
+
+    const plant = await Plant.findOne({ _id: req.params.id, userId: req.user._id });
+
     if (!plant) {
-      return res.status(404).json({ message: 'Plant not found or not authorized' });
+      return res.status(404).json({ message: 'Plant not found or you do not have access to this plant.' });
     }
     res.status(200).json(plant);
   } catch (error) {
-    console.error('Error in getPlantById:', error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('getPlantById error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
 exports.deletePlant = async (req, res) => {
   try {
-    const plant = await Plant.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
-    if (!plant) {
-      return res.status(404).json({ message: 'Plant not found or not authorized to delete' });
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }
-    res.status(200).json({ message: 'Plant removed' });
+
+    const plant = await Plant.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+
+    if (!plant) {
+      return res.status(404).json({ message: 'Plant not found or you do not have access to delete this plant.' });
+    }
+    res.status(200).json({ message: 'Plant deleted successfully', plantId: req.params.id });
   } catch (error) {
-    console.error('Error in deletePlant:', error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('deletePlant error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
 exports.updatePlant = async (req, res) => {
   try {
-    const { id } = req.params;
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
+    }
+
     const plant = await Plant.findOneAndUpdate(
-      { _id: id, userId: req.user.id },
+      { _id: req.params.id, userId: req.user._id },
       req.body,
-      { new: true, runValidators: true }
+      { new: true } // Return the updated document
     );
+
     if (!plant) {
-      return res.status(404).json({ message: 'Plant not found or not authorized to update' });
+      return res.status(404).json({ message: 'Plant not found or you do not have access to update this plant.' });
     }
     res.status(200).json(plant);
   } catch (error) {
-    console.error('Error in updatePlant:', error);
-    res.status(400).json({ message: 'Error updating plant', error: error.message });
+    console.error('updatePlant error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
 exports.identifyPlant = async (req, res) => {
-  // This is a placeholder for actual plant identification logic (e.g., external API call)
   try {
-    const { photoUrl } = req.body;
-    if (!photoUrl) {
-      return res.status(400).json({ message: 'Photo URL is required for identification.' });
+    // This endpoint should still be protected by authMiddleware
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
+    }
+    // In a real application, this would involve calling an external plant identification API
+    // For now, let's simulate a response
+    const { imageUrl } = req.body;
+    if (!imageUrl) {
+      return res.status(400).json({ message: 'Image URL is required for identification.' });
     }
 
-    // Simulate an external API call for plant identification
-    const identifiedData = {
+    // Simulate identification result
+    const identifiedResult = {
       scientificName: 'Monstera deliciosa',
       commonName: 'Swiss Cheese Plant',
       confidenceScore: 0.95,
@@ -103,211 +129,232 @@ exports.identifyPlant = async (req, res) => {
         light: 'Bright indirect light',
         water: 'Water when top inch of soil is dry',
         soil: 'Well-draining potting mix',
-        temperature: '18-30°C',
+        temperature: '65-80°F (18-27°C)',
       },
       toxicity: {
         isToxicToCats: true,
         isToxicToDogs: true,
-        isToxicToHumans: true,
-        symptoms: 'Oral irritation, vomiting, difficulty swallowing',
-        severity: 'Mild to Moderate',
+        isToxicToHumans: false,
+        symptoms: 'Oral irritation, pain and swelling of mouth, tongue and lips, vomiting, difficulty swallowing.',
       },
-      imageUrl: photoUrl,
     };
-    res.status(200).json(identifiedData);
+    res.status(200).json(identifiedResult);
   } catch (error) {
-    console.error('Error in identifyPlant:', error);
-    res.status(500).json({ message: 'Plant identification failed.' });
+    console.error('identifyPlant error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
 exports.getCareTipsBySpecies = async (req, res) => {
   try {
-    const { species } = req.params;
-    // In a real application, you might fetch this from a database or external API
-    const careTips = {
-      'Monstera deliciosa': {
-        light: 'Bright indirect light',
-        water: 'Water when top inch of soil is dry',
-        soil: 'Well-draining potting mix',
-        temperature: '18-30°C',
-        growthTips: 'Provide a moss pole for climbing.',
-        maintenanceFrequency: 'Moderate',
-        indoorSuitability: true,
-        outdoorSuitability: false,
-      },
-      'Aloe vera': {
-        light: 'Bright direct light',
-        water: 'Water thoroughly, allow soil to dry completely between waterings',
-        soil: 'Sandy, well-draining soil',
-        temperature: '13-27°C',
-        growthTips: 'Propagate from pups.',
-        maintenanceFrequency: 'Low',
-        indoorSuitability: true,
-        outdoorSuitability: true,
-      },
-      // ... more species
-    };
-    const tips = careTips[species];
-    if (tips) {
-      res.status(200).json(tips);
-    } else {
-      res.status(404).json({ message: 'Care tips not found for this species.' });
+    // This endpoint should still be protected by authMiddleware
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }
+    const { species } = req.params;
+    // In a real application, fetch care tips from a database or external API
+    const careTips = {
+      light: 'Indirect sunlight',
+      water: 'Water regularly',
+      soil: 'Well-drained soil',
+      temperature: 'Moderate',
+      growthTips: `Optimal conditions for ${species} include consistent humidity and avoiding direct harsh sunlight.`,
+      maintenanceFrequency: 'Weekly',
+      indoorSuitability: true,
+      outdoorSuitability: false,
+    };
+    res.status(200).json(careTips);
   } catch (error) {
-    console.error('Error in getCareTipsBySpecies:', error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('getCareTipsBySpecies error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
 exports.getToxicityInfo = async (req, res) => {
   try {
-    const { id } = req.params;
-    const plant = await Plant.findOne({ _id: id, userId: req.user.id }).select('toxicity');
-    if (!plant || !plant.toxicity) {
-      return res.status(404).json({ message: 'Toxicity information not found for this plant.' });
+    // This endpoint should still be protected by authMiddleware
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }
-    res.status(200).json(plant.toxicity);
+    const { id } = req.params; // Assuming 'id' refers to plant ID to retrieve its toxicity info
+    const plant = await Plant.findById(id);
+
+    if (!plant || plant.userId.toString() !== req.user._id.toString()) {
+      return res.status(404).json({ message: 'Plant not found or you do not have access.' });
+    }
+
+    if (plant.toxicity) {
+      res.status(200).json(plant.toxicity);
+    } else {
+      res.status(404).json({ message: 'Toxicity information not available for this plant.' });
+    }
   } catch (error) {
-    console.error('Error in getToxicityInfo:', error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('getToxicityInfo error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
 exports.addJournalEntry = async (req, res) => {
   try {
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
+    }
+
     const { plantId } = req.params;
     const { notes, photoUrl } = req.body;
 
     if (!notes) {
-      return res.status(400).json({ message: 'Journal entry notes are required.' });
+      return res.status(400).json({ message: 'Journal entry notes cannot be empty.' });
     }
 
-    const plant = await Plant.findOne({ _id: plantId, userId: req.user.id });
+    const plant = await Plant.findOne({ _id: plantId, userId: req.user._id });
+
     if (!plant) {
-      return res.status(404).json({ message: 'Plant not found or not authorized.' });
+      return res.status(404).json({ message: 'Plant not found or you do not have access to add a journal entry to this plant.' });
     }
 
     const newEntry = {
-      entryId: new mongoose.Types.ObjectId().toString(), // Generate a unique ID for the entry
+      entryId: new Date().getTime().toString(), // Simple unique ID
+      timestamp: new Date(),
       notes,
       photoUrl,
-      timestamp: new Date(),
     };
+
     plant.journalEntries.push(newEntry);
     await plant.save();
 
-    res.status(201).json(plant); // Return the updated plant object
+    res.status(201).json(plant); // Return the updated plant with new journal entry
   } catch (error) {
-    console.error('Error adding journal entry:', error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('addJournalEntry error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
 exports.deleteJournalEntry = async (req, res) => {
   try {
-    const { plantId, entryId } = req.params;
-
-    const plant = await Plant.findOne({ _id: plantId, userId: req.user.id });
-    if (!plant) {
-      return res.status(404).json({ message: 'Plant not found or not authorized.' });
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }
 
-    plant.journalEntries = plant.journalEntries.filter(
-      (entry) => entry.entryId !== entryId
-    );
-    await plant.save();
-
-    res.status(200).json(plant); // Return the updated plant object
-  } catch (error) {
-    console.error('Error deleting journal entry:', error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-};
-
-exports.updateJournalEntry = async (req, res) => {
-  try {
     const { plantId, entryId } = req.params;
-    const { notes, photoUrl } = req.body;
 
-    const plant = await Plant.findOne({ _id: plantId, userId: req.user.id });
+    const plant = await Plant.findOne({ _id: plantId, userId: req.user._id });
+
     if (!plant) {
-      return res.status(404).json({ message: 'Plant not found or not authorized.' });
+      return res.status(404).json({ message: 'Plant not found or you do not have access.' });
     }
 
-    const entryIndex = plant.journalEntries.findIndex(
-      (entry) => entry.entryId === entryId
-    );
+    const initialLength = plant.journalEntries.length;
+    plant.journalEntries = plant.journalEntries.filter(entry => entry.entryId !== entryId);
 
-    if (entryIndex === -1) {
+    if (plant.journalEntries.length === initialLength) {
       return res.status(404).json({ message: 'Journal entry not found.' });
     }
 
-    // Update the entry
-    plant.journalEntries[entryIndex].notes = notes || plant.journalEntries[entryIndex].notes;
-    plant.journalEntries[entryIndex].photoUrl = photoUrl || plant.journalEntries[entryIndex].photoUrl;
-    // Optionally update timestamp if the entry content changes
-    plant.journalEntries[entryIndex].timestamp = new Date();
-
     await plant.save();
-
-    res.status(200).json(plant); // Return the updated plant object
+    res.status(200).json(plant); // Return the updated plant
   } catch (error) {
-    console.error('Error updating journal entry:', error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('deleteJournalEntry error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
-// Export journal to PDF
-exports.exportJournalPDF = async (req, res) => {
-  const plants = await Plant.find({ userId: req.user.id }).populate('journalEntries');
 
-  const doc = new PDFDocument();
-  let buffers = [];
+exports.updateJournalEntry = async (req, res) => {
+  try {
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
+    }
 
-  doc.on('data', buffers.push.bind(buffers));
-  doc.on('end', () => {
-    let pdfData = Buffer.concat(buffers);
-    res
-      .writeHead(200, {
+    const { plantId, entryId } = req.params;
+    const { notes, photoUrl } = req.body;
+
+    const plant = await Plant.findOne({ _id: plantId, userId: req.user._id });
+
+    if (!plant) {
+      return res.status(404).json({ message: 'Plant not found or you do not have access.' });
+    }
+
+    const entryToUpdate = plant.journalEntries.find(entry => entry.entryId === entryId);
+
+    if (!entryToUpdate) {
+      return res.status(404).json({ message: 'Journal entry not found.' });
+    }
+
+    if (notes !== undefined) {
+      entryToUpdate.notes = notes;
+    }
+    if (photoUrl !== undefined) {
+      entryToUpdate.photoUrl = photoUrl;
+    }
+
+    await plant.save(); // Save the parent plant document to persist changes in the subdocument
+    res.status(200).json(plant); // Return the updated plant
+  } catch (error) {
+    console.error('updateJournalEntry error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+
+exports.exportPDF = async (req, res) => {
+  try {
+    // Explicitly check for authenticated user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
+    }
+
+    const plants = await Plant.find({ userId: req.user._id });
+
+    const doc = new PDFDocument();
+    let buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      let pdfData = Buffer.concat(buffers);
+      res.writeHead(200, {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'attachment;filename=garden_journal.pdf',
         'Content-Length': pdfData.length,
       })
       .end(pdfData);
-  });
+    });
 
-  doc.fontSize(18).text('Your Garden Journal', { align: 'center' });
-  plants.forEach((plant) => {
-    doc
-      .moveDown()
-      .fontSize(14)
-      .text(`Plant Name: ${plant.name}`, { underline: true })
-      .fontSize(12)
-      .text(`Scientific Name: ${plant.scientificName || 'N/A'}`)
-      .text(`Planted Date: ${plant.plantedDate ? new Date(plant.plantedDate).toLocaleDateString() : 'N/A'}`)
-      .moveDown()
-      .text('Care Tips:', { underline: true })
-      .text(`  Light: ${plant.careTips?.light || 'N/A'}`)
-      .text(`  Water: ${plant.careTips?.water || 'N/A'}`)
-      .text(`  Temperature: ${plant.careTips?.temperature || 'N/A'}`)
-      .text(`  Soil: ${plant.careTips?.soil || 'N/A'}`)
-      .moveDown();
+    doc.fontSize(18).text('Your Garden Journal', { align: 'center' });
+    plants.forEach((plant) => {
+      doc
+        .moveDown()
+        .fontSize(14)
+        .text(`Plant Name: ${plant.name}`, { underline: true })
+        .fontSize(12)
+        .text(`Scientific Name: ${plant.scientificName || 'N/A'}`)
+        .text(`Planted Date: ${plant.plantedDate ? new Date(plant.plantedDate).toLocaleDateString() : 'N/A'}`)
+        .moveDown()
+        .text('Care Tips:', { underline: true })
+        .text(`  Light: ${plant.careTips?.light || 'N/A'}`)
+        .text(`  Water: ${plant.careTips?.water || 'N/A'}`)
+        .text(`  Temperature: ${plant.careTips?.temperature || 'N/A'}`)
+        .text(`  Soil: ${plant.careTips?.soil || 'N/A'}`)
+        .moveDown();
 
-    if (plant.journalEntries && plant.journalEntries.length > 0) {
-      doc.fontSize(12).text('Journal Entries:', { underline: true });
-      plant.journalEntries.forEach((entry) => {
-        doc
-          .text(`  Date: ${new Date(entry.timestamp).toLocaleDateString()}`)
-          .text(`  Notes: ${entry.notes}`)
-          .text(`  Photo: ${entry.photoUrl || 'N/A'}`)
-          .moveDown();
-      });
-    } else {
-      doc.fontSize(12).text('No journal entries for this plant.', { italic: true }).moveDown();
-    }
-    doc.moveDown(); // Space between plants
-  });
+      if (plant.journalEntries && plant.journalEntries.length > 0) {
+        doc.fontSize(12).text('Journal Entries:', { underline: true });
+        plant.journalEntries.forEach((entry) => {
+          doc
+            .text(`  Date: ${new Date(entry.timestamp).toLocaleDateString()}`)
+            .text(`  Notes: ${entry.notes}`)
+            .moveDown();
+        });
+      } else {
+        doc.fontSize(12).text('No journal entries for this plant.', { italic: true }).moveDown();
+      }
+    });
 
-  doc.end();
+    doc.end();
+  } catch (error) {
+    console.error('exportPDF error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
 };

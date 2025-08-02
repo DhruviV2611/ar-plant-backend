@@ -10,15 +10,16 @@ const {
   getCareTipsBySpecies,
   getToxicityInfo,
   addJournalEntry,
-  deleteJournalEntry
+  deleteJournalEntry,
 } = require('../controllers/plantController');
-const {protect,verifyToken} = require('../middleWare/authMiddleware');
+
+const { protect } = require('../middleWare/authMiddleware');
 
 router.get('/getPlants', protect, getPlants);
 router.post('/addPlant', protect, addPlant);
 router.get('/:id', protect, getPlantById);
 router.delete('/:id', protect, deletePlant);
-router.put('/:id', protect, updatePlant); 
+router.put('/:id', protect, updatePlant);
 router.post('/identify', protect, identifyPlant);
 router.get('/care/:species', protect, getCareTipsBySpecies);
 router.get('/toxicity/:id', protect, getToxicityInfo);
