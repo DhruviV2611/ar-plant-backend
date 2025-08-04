@@ -61,6 +61,11 @@ exports.getPlantById = async (req, res) => {
     res.status(200).json(plant);
   } catch (error) {
     console.error('getPlantById error:', error);
+    // Check for Mongoose CastError
+    if (error.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid Plant ID format.', error: error.message });
+    }
+    // For any other unexpected errors, return a 500
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };

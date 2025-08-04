@@ -60,19 +60,35 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user || user.password !== password) {
-    return res.status(401).json({ message: 'Invalid credentials' });
+  try {
+    const user = await User.findOne({ email });
+
+    // 1. Check if user exists
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // 2. Compare the provided password with the hashed password in the database
+    //    using bcrypt.compare()
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // If we reach here, credentials are valid
+    const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.TOKEN_EXPIRY });
+    //const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY });
+
+    // Store refresh token in DB
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    res.json({ token: accessToken, refreshToken, user: { _id: user._id, email: user.email } });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ message: 'Server error during login' });
   }
-
-  const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.TOKEN_EXPIRY });
-  const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY });
-
-  // Store refresh token in DB
-  user.refreshToken = refreshToken;
-  await user.save();
-
-  res.json({ token: accessToken, refreshToken, user: { _id: user._id, email: user.email } });
 };
 
 exports.updateUserProfile = async (req, res) => {
