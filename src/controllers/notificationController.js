@@ -1,14 +1,19 @@
 // src/controllers/notificationController.js
-
+const path = require('path');
 const admin = require('firebase-admin');
 const User = require('../models/user');
+const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-if (!admin.apps.length) {
-  const serviceAccount = require('../config/firebaseServiceAccountKey.json'); // Make sure this path is correct
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+
+if (!serviceAccountPath) {
+  throw new Error("GOOGLE_APPLICATION_CREDENTIALS is not set in .env");
 }
+
+const serviceAccount = require(path.resolve(serviceAccountPath));
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 // New function to save the FCM token
 exports.saveFcmToken = async (req, res) => {
@@ -39,12 +44,12 @@ exports.sendTestNotification = async (req, res) => {
     }
     const message = {
       notification: {
-        title: 'Test Notification 2',
-        body: 'This is a test notification from AR Plant App! 2',
+        title: 'Test Notification',
+        body: 'This is a test notification from AR Plant App!',
       },
       data: {
-        title: 'Test Notification 2',
-        body: 'This is a test notification from AR Plant App! 2',
+        title: 'Test Notification',
+        body: 'This is a test notification from AR Plant App!',
       },
       token: fcmToken,
     };
