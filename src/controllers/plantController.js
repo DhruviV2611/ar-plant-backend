@@ -114,18 +114,16 @@ exports.updatePlant = async (req, res) => {
 
 exports.identifyPlant = async (req, res) => {
   try {
-    // This endpoint should still be protected by authMiddleware
+    // Explicitly check for authenticated user
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }
-    // In a real application, this would involve calling an external plant identification API
-    // For now, let's simulate a response
+
     const { imageUrl } = req.body;
     if (!imageUrl) {
       return res.status(400).json({ message: 'Image URL is required for identification.' });
     }
 
-    // Simulate identification result
     const identifiedResult = {
       scientificName: 'Monstera deliciosa',
       commonName: 'Swiss Cheese Plant',
@@ -143,6 +141,7 @@ exports.identifyPlant = async (req, res) => {
         symptoms: 'Oral irritation, pain and swelling of mouth, tongue and lips, vomiting, difficulty swallowing.',
       },
     };
+
     res.status(200).json(identifiedResult);
   } catch (error) {
     console.error('identifyPlant error:', error);
@@ -207,7 +206,8 @@ exports.addJournalEntry = async (req, res) => {
     }
 
     const { plantId } = req.params;
-    const { notes, photoUrl } = req.body;
+    // Destructure all new fields from the request body
+    const { date, location, subject, notes, photoUrl,name, healthStatus } = req.body;
 
     if (!notes) {
       return res.status(400).json({ message: 'Journal entry notes cannot be empty.' });
@@ -220,16 +220,22 @@ exports.addJournalEntry = async (req, res) => {
     }
 
     const newEntry = {
-      entryId: new Date().getTime().toString(), // Simple unique ID
-      timestamp: new Date(),
+      entryId: new Date().getTime().toString(),
+      date, 
+      location,
+      subject,
       notes,
       photoUrl,
+      name,
+      healthStatus,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     plant.journalEntries.push(newEntry);
     await plant.save();
 
-    res.status(201).json(plant); // Return the updated plant with new journal entry
+    res.status(201).json(plant);
   } catch (error) {
     console.error('addJournalEntry error:', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
@@ -269,13 +275,12 @@ exports.deleteJournalEntry = async (req, res) => {
 
 exports.updateJournalEntry = async (req, res) => {
   try {
-    // Explicitly check for authenticated user
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }
 
     const { plantId, entryId } = req.params;
-    const { notes, photoUrl } = req.body;
+    const { date, location, subject, notes, photoUrl, name, healthStatus } = req.body;
 
     const plant = await Plant.findOne({ _id: plantId, userId: req.user._id });
 
@@ -295,9 +300,26 @@ exports.updateJournalEntry = async (req, res) => {
     if (photoUrl !== undefined) {
       entryToUpdate.photoUrl = photoUrl;
     }
+    
+    if (date !== undefined) {
+      entryToUpdate.date = date;
+    }
+    if (location !== undefined) {
+      entryToUpdate.location = location;
+    }
+    if (subject !== undefined) {
+      entryToUpdate.subject = subject;
+    }
+    if (name !== undefined) {
+      entryToUpdate.name = name;
+    }
+    if (healthStatus !== undefined) {
+      entryToUpdate.healthStatus = healthStatus;
+    }
+    entryToUpdate.updatedAt = new Date();
 
-    await plant.save(); // Save the parent plant document to persist changes in the subdocument
-    res.status(200).json(plant); // Return the updated plant
+    await plant.save();
+    res.status(200).json(plant);
   } catch (error) {
     console.error('updateJournalEntry error:', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
@@ -307,7 +329,6 @@ exports.updateJournalEntry = async (req, res) => {
 
 exports.exportPDF = async (req, res) => {
   try {
-    // Explicitly check for authenticated user
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }

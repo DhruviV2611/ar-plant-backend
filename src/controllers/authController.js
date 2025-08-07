@@ -29,9 +29,7 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Basic email validation
-    // CORRECTED: The regex should be defined without double escaping
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Changed from /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         message: 'Invalid email format',
@@ -68,28 +66,40 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // 2. Compare the provided password with the hashed password in the database
-    //    using bcrypt.compare()
+    // 2. Compare the provided password with the hashed password
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // If we reach here, credentials are valid
-    const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.TOKEN_EXPIRY });
-    //const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY });
+    // 3. Generate only accessToken
+    const accessToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.TOKEN_EXPIRY }
+    );
 
-    // Store refresh token in DB
-    user.refreshToken = refreshToken;
-    await user.save();
+    // ✅ Do not generate or store refreshToken
+    // const refreshToken = jwt.sign(
+    //   { id: user._id },
+    //   process.env.JWT_REFRESH_SECRET,
+    //   { expiresIn: process.env.REFRESH_TOKEN_EXPIRY }
+    // );
 
-    res.json({ token: accessToken, refreshToken, user: { _id: user._id, email: user.email } });
+    res.json({
+      token: accessToken,
+      user: {
+        _id: user._id,
+        email: user.email,
+      },
+    });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ message: 'Server error during login' });
   }
 };
+
 
 exports.updateUserProfile = async (req, res) => {
   const updated = await User.findByIdAndUpdate(req.user.id, req.body, { new: true });

@@ -2,11 +2,16 @@
 const mongoose = require('mongoose');
 
 const journalEntrySchema = new mongoose.Schema({
-  entryId: { type: String, required: true }, // Unique ID for each entry
-  timestamp: { type: Date, default: Date.now },
+  entryId: { type: String, required: true },
+  date: { type: Date, required: true },
+  location: { type: String, required: true },
+  subject: { type: String, required: true },
   notes: { type: String, required: true },
-  photoUrl: String, // URL to the stored photo
-  // Add more fields here for growth measurement, e.g., height: Number
+  photoUrl: String,
+  name: String,
+  healthStatus: String,
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 });
 
 const reminderSchema = new mongoose.Schema({

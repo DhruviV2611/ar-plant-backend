@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
     exportFormat: String,
   },
   refreshToken: String,
+  fcmToken: String,
 });
 
 module.exports = mongoose.model('User', userSchema);

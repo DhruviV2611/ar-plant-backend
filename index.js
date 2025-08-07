@@ -52,9 +52,12 @@ mongoose.connect(process.env.MONGO_URI)
 
 const plantRoutes = require('./src/routes/plantRoutes');
 const authRoutes = require('./src/routes/authRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes'); 
 
 app.use('/api/plants', plantRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/notifications', notificationRoutes);
+
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {
