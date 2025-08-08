@@ -2,6 +2,8 @@
 const path = require('path');
 const admin = require('firebase-admin');
 const User = require('../models/user');
+const Notification = require('../models/notification');
+
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 
@@ -42,29 +44,46 @@ exports.sendTestNotification = async (req, res) => {
     if (!fcmToken) {
       return res.status(400).json({ message: 'FCM token not found for user.' });
     }
-    const message = {
+
+    const notificationPayload = {
       notification: {
-        title: 'Test Notification',
-        body: 'This is a test notification from AR Plant App!',
+        title: 'reminder',
+        body: 'take care of Aloe Vera',
       },
       data: {
-        title: 'Test Notification',
-        body: 'This is a test notification from AR Plant App!',
+        title: 'reminder',
+        body: 'take care of Aloe Vera',
       },
       token: fcmToken,
     };
-    await admin.messaging().send(message);
+
+       await admin.messaging().send(notificationPayload);
+
+    // Save to DB
+    await Notification.create({
+      userId: req.user.id,
+      title: notificationPayload.notification.title,
+      body: notificationPayload.notification.body,
+    });
 
     res.status(200).json({ message: 'Notification sent successfully' });
   } catch (error) {
     console.error('Error sending notification:', error);
-    if (error.code) {
-      res.status(500).json({
-        message: `Failed to send notification: ${error.message}`,
-        firebaseErrorCode: error.code
-      });
-    } else {
-      res.status(500).json({ message: 'Failed to send notification', error: error.message });
-    }
+    res.status(500).json({
+      message: 'Failed to send notification',
+      error: error.message,
+      firebaseErrorCode: error.code || null
+    });
+  }
+};
+
+exports.getNotificationHistory = async (req, res) => {
+  try {
+    const history = await Notification.find({ userId: req.user.id }).sort({ sentAt: -1 });
+
+    res.status(200).json({ notifications: history });
+  } catch (error) {
+    console.error('Error fetching notification history:', error);
+    res.status(500).json({ message: 'Failed to fetch notification history.', error: error.message });
   }
 };

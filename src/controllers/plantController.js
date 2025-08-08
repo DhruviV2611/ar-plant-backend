@@ -200,45 +200,31 @@ exports.getToxicityInfo = async (req, res) => {
 
 exports.addJournalEntry = async (req, res) => {
   try {
-    // Explicitly check for authenticated user
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: 'Unauthorized: User not authenticated.' });
     }
 
     const { plantId } = req.params;
-    // Destructure all new fields from the request body
-    const { date, location, subject, notes, photoUrl,name, healthStatus } = req.body;
+    const journalEntry = req.body;
 
-    if (!notes) {
-      return res.status(400).json({ message: 'Journal entry notes cannot be empty.' });
+    if (!journalEntry || !journalEntry.notes || !journalEntry.date || !journalEntry.name) {
+      return res.status(400).json({ message: 'Invalid journal entry data. Notes, date, and name are required.' });
     }
 
-    const plant = await Plant.findOne({ _id: plantId, userId: req.user._id });
+    const updatedPlant = await Plant.findOneAndUpdate(
+      { _id: plantId, userId: req.user._id },
+      { $push: { journalEntries: journalEntry } },
+      { new: true, runValidators: true }
+    );
 
-    if (!plant) {
-      return res.status(404).json({ message: 'Plant not found or you do not have access to add a journal entry to this plant.' });
+    if (!updatedPlant) {
+      return res.status(404).json({ message: 'Plant not found or user is not authorized to update this plant.' });
     }
 
-    const newEntry = {
-      entryId: new Date().getTime().toString(),
-      date, 
-      location,
-      subject,
-      notes,
-      photoUrl,
-      name,
-      healthStatus,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    plant.journalEntries.push(newEntry);
-    await plant.save();
-
-    res.status(201).json(plant);
+    res.status(200).json(updatedPlant);
   } catch (error) {
-    console.error('addJournalEntry error:', error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error('Error in addJournalEntry:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 

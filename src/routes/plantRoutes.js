@@ -23,7 +23,7 @@ router.put('/:id', protect, updatePlant);
 router.post('/identify', protect, identifyPlant);
 router.get('/care/:species', protect, getCareTipsBySpecies);
 router.get('/toxicity/:id', protect, getToxicityInfo);
-router.post('/:plantId/journal', protect, addJournalEntry);
+router.post('/add-journal/:plantId', protect, addJournalEntry);
 router.delete('/:plantId/journal/:entryId', protect, deleteJournalEntry);
 
 module.exports = router;
